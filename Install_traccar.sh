@@ -20,7 +20,7 @@ sed -i 's|\.replace("{statusCode}", calculateStatus(position));|.replace("{statu
     src/main/java/org/traccar/forward/PositionForwarderUrl.java
 
 echo "=== Build starten ==="
-./gradlew clean build copyWeb
+./gradlew clean build
 
 echo "=== Installation anlegen ==="
 mkdir -p /opt/traccar
