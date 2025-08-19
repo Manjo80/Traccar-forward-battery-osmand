@@ -59,18 +59,6 @@ Standard ist die interne H2-Datenbank. Optional kannst du später auf MySQL oder
 
 ---
 
-## 🧰 Optionen zur Erweiterung (manuell)
-
-Diese Optionen sind **nicht im Standard-Skript aktiviert**, können aber einfach nachgerüstet werden:
-
-- **MySQL oder PostgreSQL verwenden**  
-  → `traccar.xml` anpassen: `database.driver`, `database.url`, `database.user`, `database.password`
-
-- **HTTPS aktivieren**  
-  → Zertifikat generieren und `conf/traccar.xml` erweitern mit SSL-Einträgen
-
-- **Benachrichtigungen (z. B. E-Mail, Webhook, Telegram)**  
-  → https://www.traccar.org/notifications/
 
 - **Webinterface-Design anpassen**  
   → `/opt/traccar-src/traccar-web` bearbeiten, erneut `npm run build` ausführen
@@ -102,13 +90,6 @@ Diese Optionen sind **nicht im Standard-Skript aktiviert**, können aber einfach
 
 - **Build schlägt fehl wegen Node-Version**  
   → Stelle sicher, dass `node -v` mindestens `v20.19.0` oder `v22.x` ist
-
-- **Webinterface fehlt**  
-  → Prüfe ob `/opt/traccar/web/index.html` existiert  
-  → Sonst `cd /opt/traccar-src/traccar-web && npm run build` erneut ausführen
-
-- **Fehlermeldung beim Start**  
-  → Logs prüfen: `/opt/traccar/logs/tracker-server.log`
 
 ---
 
