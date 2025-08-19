@@ -39,7 +39,10 @@ cat <<EOF > /opt/traccar/conf/traccar.xml
     <entry key='database.user'>sa</entry>
     <entry key='database.password'></entry>
     <entry key='forward.enable'>true</entry>
-    <entry key='forward.url'>http://"richtige Adresse oder ip einfügen":5055/?id={uniqueId}&amp;timestamp={fixTime}&amp;lat={latitude}&amp;lon={longitude}&amp;speed={speed}&amp;bearing={course}&amp;altitude={altitude}&amp;accuracy={accuracy}&amp;status={statusCode}&amp;batt={batteryLevel}</entry>
+    echo "=== IP und Port für forward.url abfragen ==="
+    read -p "Ziel-IP oder Domain für Forwarding (z.B. 192.168.1.100): " FORWARD_IP
+    read -p "Port (z.B. 8080): " FORWARD_PORT
+    <entry key=http://${FORWARD_IP}:${FORWARD_PORT}/?id={uniqueId}&amp;timestamp={fixTime}&amp;lat={latitude}&amp;lon={longitude}&amp;speed={speed}&amp;bearing={course}&amp;altitude={altitude}&amp;accuracy={accuracy}&amp;status={statusCode}&amp;batt={batteryLevel}</entry>
 </properties>
 EOF
 
