@@ -29,11 +29,18 @@ sed -i 's|\.replace("{statusCode}", calculateStatus(position));|.replace("{statu
 echo "=== Build starten ==="
 ./gradlew clean build -Dfile.encoding=UTF-8
 
+echo "=== Web-Interface bauen ==="
+cd /opt/traccar-src/traccar-web
+npm install --legacy-peer-deps
+npm run build
+cd /opt/traccar-src
+
 echo "=== Installation anlegen ==="
 mkdir -p /opt/traccar
 cp /opt/traccar-src/target/tracker-server.jar /opt/traccar/
 cp -r /opt/traccar-src/target/lib /opt/traccar/
 cp -r /opt/traccar-src/schema /opt/traccar/schema
+cp -r /opt/traccar-src/traccar-web/build /opt/traccar/web
 
 echo "=== IP und Port für forward.url abfragen ==="
 read -p "Ziel-IP oder Domain für Forwarding (z.B. 192.168.1.100): " FORWARD_IP
