@@ -51,7 +51,7 @@ Die IP-Adressen aller Interfaces werden automatisch angezeigt.
 ### `forward.url`
 Du wirst beim Installieren nach Ziel-IP und Port gefragt, z. B.:
 
-http://192.168.1.50:8080/?id={uniqueId}&timestamp={fixTime}&lat={latitude}&lon={longitude}&speed={speed}&status={statusCode}&batt={batteryLevel}
+http://<IP>:8080/?id={uniqueId}&timestamp={fixTime}&lat={latitude}&lon={longitude}&speed={speed}&status={statusCode}&batt={batteryLevel}
 
 
 ### Datenbank
