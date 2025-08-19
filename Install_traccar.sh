@@ -2,8 +2,14 @@
 set -e
 
 echo "=== Benötigte Pakete installieren ==="
-curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-apt update && apt install -y gradle openjdk-17-jdk curl unzip build-essential npm nodejs net-tools
+apt update && apt install -y gradle openjdk-17-jdk curl unzip build-essential net-tools git
+
+echo "=== Node.js 18 via nvm installieren ==="
+export NVM_DIR="/root/.nvm"
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source "$NVM_DIR/nvm.sh"
+nvm install 18
+nvm use 18
 
 echo "=== Alte Installation entfernen ==="
 systemctl stop traccar 2>/dev/null || true
