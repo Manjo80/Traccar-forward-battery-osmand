@@ -27,7 +27,7 @@ sed -i 's|\.replace("{statusCode}", calculateStatus(position));|.replace("{statu
     src/main/java/org/traccar/forward/PositionForwarderUrl.java
 
 echo "=== Build starten ==="
-./gradlew clean build
+./gradlew clean build -Dfile.encoding=UTF-8
 
 echo "=== Webinterface prüfen und installieren ==="
 if [ -d "target/web" ]; then
