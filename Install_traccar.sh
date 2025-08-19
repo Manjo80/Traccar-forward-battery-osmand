@@ -84,4 +84,12 @@ systemctl start traccar
 echo "=== Status anzeigen ==="
 sleep 2
 systemctl status traccar --no-pager
- 
+
+ echo ""
+echo "=== Traccar ist gestartet ==="
+echo "📍 Webinterface erreichbar unter:"
+ip addr show | awk '/inet / && $NF != "lo" {print "➡️  http://" $2}' | sed 's/\/.*//' | while read IP; do
+    echo "   → http://${IP}:8082"
+done
+echo ""
+
