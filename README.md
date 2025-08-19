@@ -40,7 +40,7 @@ Dieses Skript installiert **Traccar 6.9.0** aus dem Quellcode, inklusive:
 ## 🌐 Webinterface
 
 Zugriff nach der Installation:
-http://<IP>:8082
+http://<IP-Adresse>:8082
 
 Die IP-Adressen aller Interfaces werden automatisch angezeigt.
 
@@ -51,7 +51,7 @@ Die IP-Adressen aller Interfaces werden automatisch angezeigt.
 ### `forward.url`
 Du wirst beim Installieren nach Ziel-IP und Port gefragt, z. B.:
 
-http://<IP>:8080/?id={uniqueId}&timestamp={fixTime}&lat={latitude}&lon={longitude}&speed={speed}&status={statusCode}&batt={batteryLevel}
+http://<IP-Adresse>:8080/?id={uniqueId}&timestamp={fixTime}&lat={latitude}&lon={longitude}&speed={speed}&status={statusCode}&batt={batteryLevel}
 
 
 ### Datenbank
