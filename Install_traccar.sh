@@ -29,16 +29,6 @@ sed -i 's|\.replace("{statusCode}", calculateStatus(position));|.replace("{statu
 echo "=== Build starten ==="
 ./gradlew clean build -Dfile.encoding=UTF-8
 
-echo "=== Webinterface prüfen und installieren ==="
-if [ -d "target/web" ]; then
-    echo "→ Webinterface erfolgreich gebaut, wird nach /opt/traccar/web kopiert"
-    mkdir -p /opt/traccar
-    cp -r target/web /opt/traccar/
-else
-    echo "❌ Webinterface konnte nicht gefunden werden (target/web fehlt)"
-    exit 1
-fi
-
 echo "=== Installation anlegen ==="
 mkdir -p /opt/traccar
 cp /opt/traccar-src/target/tracker-server.jar /opt/traccar/
