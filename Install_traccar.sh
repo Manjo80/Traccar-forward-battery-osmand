@@ -2,7 +2,8 @@
 set -e
 
 echo "=== Benötigte Pakete installieren ==="
-apt update && apt install -y gradle openjdk-17-jdk curl unzip build-essential
+curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+apt update && apt install -y gradle openjdk-17-jdk curl unzip build-essential npm nodejs
 
 echo "=== Alte Installation entfernen ==="
 systemctl stop traccar 2>/dev/null || true
