@@ -29,9 +29,6 @@ sed -i 's|\.replace("{statusCode}", calculateStatus(position));|.replace("{statu
 echo "=== Build starten ==="
 ./gradlew clean build
 
-echo "=== Build starten ==="
-./gradlew clean build
-
 echo "=== Webinterface prüfen und installieren ==="
 if [ -d "target/web" ]; then
     echo "→ Webinterface erfolgreich gebaut, wird nach /opt/traccar/web kopiert"
@@ -47,6 +44,7 @@ mkdir -p /opt/traccar
 cp /opt/traccar-src/target/tracker-server.jar /opt/traccar/
 cp -r /opt/traccar-src/target/lib /opt/traccar/
 cp -r /opt/traccar-src/schema /opt/traccar/schema
+cp -r /opt/traccar-src/target/web /opt/traccar/web
 
 echo "=== IP und Port für forward.url abfragen ==="
 read -p "Ziel-IP oder Domain für Forwarding (z.B. 192.168.1.100): " FORWARD_IP
