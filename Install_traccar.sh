@@ -91,11 +91,12 @@ echo "=== Status anzeigen ==="
 sleep 2
 systemctl status traccar --no-pager
 
- echo ""
+WEB_PORT=8082
+
+echo ""
 echo "=== Traccar ist gestartet ==="
 echo "📍 Webinterface erreichbar unter:"
 ip addr show | awk '/inet / && $NF != "lo" {print "➡️  http://" $2}' | sed 's/\/.*//' | while read IP; do
-    echo "   → http://${IP}:8082"
+    echo "   → http://${IP}:${WEB_PORT}"
 done
 echo ""
-
