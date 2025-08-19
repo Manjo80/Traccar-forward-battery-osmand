@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+echo "=== Benötigte Pakete installieren ==="
+apt update && apt install -y git openjdk-17-jdk curl unzip build-essential
+
 echo "=== Alte Installation entfernen ==="
 systemctl stop traccar 2>/dev/null || true
 rm -rf /opt/traccar
