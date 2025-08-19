@@ -4,12 +4,13 @@ set -e
 echo "=== Benötigte Pakete installieren ==="
 apt update && apt install -y gradle openjdk-17-jdk curl unzip build-essential net-tools git
 
-echo "=== Node.js 18 via nvm installieren ==="
+echo "=== Node.js 22 via nvm installieren ==="
 export NVM_DIR="/root/.nvm"
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 source "$NVM_DIR/nvm.sh"
-nvm install 18
-nvm use 18
+nvm install 22
+nvm use 22
+
 
 echo "=== Alte Installation entfernen ==="
 systemctl stop traccar 2>/dev/null || true
