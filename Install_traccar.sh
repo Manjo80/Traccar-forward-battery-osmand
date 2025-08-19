@@ -96,7 +96,7 @@ WEB_PORT=8082
 echo ""
 echo "=== Traccar ist gestartet ==="
 echo "📍 Webinterface erreichbar unter:"
-ip addr show | awk '/inet / && $NF != "lo" {print "➡️  http://" $2}' | sed 's/\/.*//' | while read IP; do
+hostname -I | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | while read IP; do
     echo "   → http://${IP}:${WEB_PORT}"
 done
 echo ""
