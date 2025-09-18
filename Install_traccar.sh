@@ -4,6 +4,16 @@ set -e
 echo "=== Benötigte Pakete installieren ==="
 apt update && apt install -y gradle openjdk-17-jdk curl unzip build-essential net-tools git
 
+echo "=== Java 17 als Standard setzen ==="
+update-alternatives --install /usr/bin/java java /usr/lib/jvm/java-17-openjdk-amd64/bin/java 1
+update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/java-17-openjdk-amd64/bin/javac 1
+update-alternatives --set java /usr/lib/jvm/java-17-openjdk-amd64/bin/java
+update-alternatives --set javac /usr/lib/jvm/java-17-openjdk-amd64/bin/javac
+
+echo "Java-Version:"
+java -version
+javac -version
+
 echo "=== Node.js 22 via nvm installieren ==="
 export NVM_DIR="/root/.nvm"
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
