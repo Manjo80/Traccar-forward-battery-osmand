@@ -31,17 +31,28 @@ need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Fehlt: $1"; }
 if command -v apt >/dev/null 2>&1; then
   log "=== Pakete installieren ==="
   $SUDO apt update -y
-  # Prüfen ob openjdk-17 existiert
+
+  # Basis-Pakete sicherstellen (manchmal fehlen sie in LXC-Minimal)
+  $SUDO apt install -y --no-install-recommends ca-certificates wget curl gnupg lsb-release apt-transport-https dirmngr
+
+  # Prüfen, ob openjdk-17 verfügbar ist
   if ! apt-cache show openjdk-17-jdk >/dev/null 2>&1; then
     warn "openjdk-17-jdk nicht im Repo gefunden – Adoptium-Repository hinzufügen."
-    $SUDO apt install -y wget gnupg software-properties-common
+
+    # Falls software-properties-common fehlt, ersetzen wir es durch direkten Repo-Eintrag
+    if ! dpkg -s software-properties-common >/dev/null 2>&1; then
+      $SUDO apt install -y --no-install-recommends software-properties-common || true
+    fi
+
+    # Adoptium-Repo hinzufügen (Temurin 17)
     wget -O- https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | $SUDO tee /usr/share/keyrings/adoptium.gpg >/dev/null
-    echo "deb [signed-by=/usr/share/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb $(lsb_release -cs) main" | $SUDO tee /etc/apt/sources.list.d/adoptium.list
+    DISTRO_CODENAME="$(lsb_release -cs 2>/dev/null || echo bookworm)"
+    echo "deb [signed-by=/usr/share/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb ${DISTRO_CODENAME} main" | $SUDO tee /etc/apt/sources.list.d/adoptium.list
     $SUDO apt update -y
-    $SUDO apt install -y temurin-17-jdk
+    $SUDO apt install -y --no-install-recommends temurin-17-jdk
     JAVA_HOME="/usr/lib/jvm/temurin-17-jdk-amd64"
   else
-    $SUDO apt install -y gradle openjdk-17-jdk curl unzip build-essential net-tools git
+    $SUDO apt install -y --no-install-recommends gradle openjdk-17-jdk curl unzip build-essential net-tools git
     JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
   fi
 else
