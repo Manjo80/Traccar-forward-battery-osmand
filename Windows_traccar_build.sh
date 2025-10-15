@@ -29,7 +29,7 @@ need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Fehlt: $1"; }
 if command -v apt >/dev/null 2>&1; then
   log "=== Pakete installieren ==="
   $SUDO apt update -y
-  $SUDO apt install -y --no-install-recommends ca-certificates wget curl gnupg lsb-release apt-transport-https unzip git build-essential net-tools
+  $SUDO apt install -y --no-install-recommends ca-certificates wget curl gnupg lsb-release apt-transport-https zip unzip git build-essential net-tools
 
   # Java prüfen / ggf. Adoptium nutzen
   if ! apt-cache show openjdk-17-jdk >/dev/null 2>&1; then
