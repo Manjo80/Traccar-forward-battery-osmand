@@ -14,12 +14,13 @@ PATCH_FORWARDER="${PATCH_FORWARDER:-0}"
 NODE_MAJOR="${NODE_MAJOR:-20}"
 
 # ================================
-# Helfer
+# Helferfunktionen
 # ================================
 log()  { echo -e "\033[1;32m[+] $*\033[0m"; }
 warn() { echo -e "\033[1;33m[!] $*\033[0m"; }
 die()  { echo -e "\033[1;31m[✗] $*\033[0m" >&2; exit 1; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Fehlt: $1"; }
+
 [[ $EUID -eq 0 ]] && SUDO="" || SUDO="sudo"
 
 # ================================
@@ -32,7 +33,7 @@ if command -v apt >/dev/null 2>&1; then
     ca-certificates wget curl gnupg lsb-release apt-transport-https \
     zip unzip git build-essential net-tools
 
-  # Java 17 bereitstellen (OpenJDK oder Adoptium)
+  # Java 17 prüfen/Installieren
   if ! apt-cache show openjdk-17-jdk >/dev/null 2>&1; then
     warn "openjdk-17-jdk nicht im Repo – installiere Temurin 17"
     wget -O- https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | $SUDO tee /usr/share/keyrings/adoptium.gpg >/dev/null
@@ -46,21 +47,21 @@ if command -v apt >/dev/null 2>&1; then
     JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
   fi
 else
-  die "apt nicht gefunden – dieses Skript erwartet Debian/Ubuntu."
+  die "apt nicht gefunden – unterstütze nur Debian/Ubuntu."
 fi
 
-# Java als Standard setzen (sofern möglich)
+# Java als Standard setzen
 if [[ -d "$JAVA_HOME" ]]; then
   log "=== Java 17 als Standard setzen ==="
-  update-alternatives --install /usr/bin/java  java  "$JAVA_HOME/bin/java"  1 || true
+  update-alternatives --install /usr/bin/java java "$JAVA_HOME/bin/java" 1 || true
   update-alternatives --install /usr/bin/javac javac "$JAVA_HOME/bin/javac" 1 || true
-  update-alternatives --set java  "$JAVA_HOME/bin/java"  || true
+  update-alternatives --set java "$JAVA_HOME/bin/java" || true
   update-alternatives --set javac "$JAVA_HOME/bin/javac" || true
 fi
 java -version || die "Java wurde nicht korrekt installiert."
 
 # ================================
-# Node.js via nvm (für Web-Build)
+# Node.js via nvm (für Web-UI)
 # ================================
 if ! command -v npm >/dev/null 2>&1; then
   log "=== Node.js ${NODE_MAJOR} via nvm installieren ==="
@@ -91,10 +92,10 @@ cd "${SRC_DIR}"
 if [[ "${PATCH_FORWARDER}" == "1" ]]; then
   TARGET_FILE="src/main/java/org/traccar/forward/PositionForwarderUrl.java"
   if [[ -f "${TARGET_FILE}" ]]; then
-    log "Wende Patch auf ${TARGET_FILE} an"
+    log "Patch anwenden an ${TARGET_FILE}"
     sed -i 's|\.replace("{statusCode}", calculateStatus(position));|.replace("{statusCode}", calculateStatus(position))\
-        .replace("{batteryLevel}", String.valueOf(position.getAttributes().getOrDefault("batteryLevel", "")))\
-        .replace("{charge}", String.valueOf(position.getAttributes().getOrDefault("charge", "")));|' \
+        .replace("{batteryLevel}", String.valueOf(position.getAttributes().getOrDefault("batteryLevel", \"\")))\
+        .replace("{charge}", String.valueOf(position.getAttributes().getOrDefault("charge", \"\")));|' \
       "${TARGET_FILE}" || warn "Patch fehlgeschlagen"
   else
     warn "Patch-Datei nicht gefunden: ${TARGET_FILE}"
@@ -102,35 +103,37 @@ if [[ "${PATCH_FORWARDER}" == "1" ]]; then
 fi
 
 # ================================
-# Server-Build (inkl. Distribution)
+# Abfrage Forward IP & Port
 # ================================
-log "=== Starte Gradle-Build (installDist) ==="
+read -p "Ziel-IP oder Domain für Forwarding (z.B. 192.168.1.100): " FORWARD_IP
+read -p "Ziel-Port für Forwarding (z.B. 8080): " FORWARD_PORT
+
+# ================================
+# Server-Build: assemble
+# ================================
+log "=== Starte Gradle-Build: assemble ==="
 chmod +x ./gradlew
-# installDist erzeugt build/install/traccar/{bin,lib}
-./gradlew --no-daemon clean installDist -Dfile.encoding=UTF-8
+./gradlew --no-daemon clean assemble -Dfile.encoding=UTF-8
 
-# Pfade zu Artefakten
-DIST_DIR="${SRC_DIR}/build/install/traccar"
-LIB_DIR="${DIST_DIR}/lib"
-[[ -d "${LIB_DIR}" ]] || die "Lib-Verzeichnis nicht gefunden: ${LIB_DIR}"
-
-# tracker-server*.jar lokalisieren (liegt auch im lib/)
-JAR_PATH="$(find "${LIB_DIR}" -maxdepth 1 -type f -name 'tracker-server*.jar' | sort | tail -n1)"
-[[ -f "${JAR_PATH}" ]] || die "tracker-server.jar nicht gefunden in ${LIB_DIR}"
+# Ergebnis-JAR suchen
+log "=== Suche nach tracker-server.jar ==="
+JAR_PATH="$(find "${SRC_DIR}" -type f -name "tracker-server*.jar" 2>/dev/null | grep -E "(target|build/libs)" | sort | tail -n1)"
+[[ -f "$JAR_PATH" ]] || die "Konnte tracker-server.jar nicht finden."
+echo "→ Gefundene JAR: $JAR_PATH"
 
 # ================================
-# Web-UI bauen (modern bevorzugt)
+# Web-UI bauen
 # ================================
 WEB_SRC=""
-if [[ -d "modern" ]]; then
+if [[ -d "${SRC_DIR}/modern" ]]; then
   WEB_SRC="modern"
-elif [[ -d "traccar-web" ]]; then
+elif [[ -d "${SRC_DIR}/traccar-web" ]]; then
   WEB_SRC="traccar-web"
 fi
 
 if [[ -n "${WEB_SRC}" ]]; then
-  log "=== Baue Web-UI in ${WEB_SRC} ==="
-  pushd "${WEB_SRC}" >/dev/null
+  log "=== Baue Web-UI (${WEB_SRC}) ==="
+  pushd "${SRC_DIR}/${WEB_SRC}" >/dev/null
   if [[ -f package-lock.json ]]; then npm ci; else npm install; fi
   npm run build
   popd >/dev/null
@@ -141,24 +144,33 @@ fi
 # ================================
 # Windows-Bundle erstellen
 # ================================
-log "=== Erstelle Windows-Bundle ==="
+log "=== Erstelle Windows-Bundle unter ${OUT_DIR} ==="
 mkdir -p "${OUT_DIR}"/{conf,logs,web,schema,data,lib}
 
-# Alle Libs + tracker-server.jar kopieren
-cp -a "${LIB_DIR}/." "${OUT_DIR}/lib/"
+# JAR in lib kopieren
+cp -f "$JAR_PATH" "${OUT_DIR}/lib/"
+
+# Alle möglichen Libs kopieren
+if [[ -d "${SRC_DIR}/build/libs" ]]; then
+  cp -a "${SRC_DIR}/build/libs/." "${OUT_DIR}/lib/"
+elif [[ -d "${SRC_DIR}/target" ]]; then
+  cp -a "${SRC_DIR}/target/." "${OUT_DIR}/lib/"
+fi
 
 # Schema kopieren (falls vorhanden)
-[[ -d "${SRC_DIR}/schema" ]] && cp -a "${SRC_DIR}/schema/." "${OUT_DIR}/schema/" || warn "Kein schema/-Ordner gefunden."
+[[ -d "${SRC_DIR}/schema" ]] && cp -a "${SRC_DIR}/schema/." "${OUT_DIR}/schema/" || warn "kein schema-Ordner gefunden."
 
-# Web-Output übernehmen
+# Web-UI Output übernehmen
 if [[ -n "${WEB_SRC}" ]]; then
-  if   [[ -d "${SRC_DIR}/${WEB_SRC}/dist"  ]]; then cp -a "${SRC_DIR}/${WEB_SRC}/dist/."  "${OUT_DIR}/web/"
-  elif [[ -d "${SRC_DIR}/${WEB_SRC}/build" ]]; then cp -a "${SRC_DIR}/${WEB_SRC}/build/." "${OUT_DIR}/web/"
+  if [[ -d "${SRC_DIR}/${WEB_SRC}/dist" ]]; then
+    cp -a "${SRC_DIR}/${WEB_SRC}/dist/." "${OUT_DIR}/web/"
+  elif [[ -d "${SRC_DIR}/${WEB_SRC}/build" ]]; then
+    cp −a "${SRC_DIR}/${WEB_SRC}/build/." "${OUT_DIR}/web/"
   fi
 fi
 
-# Minimal-Konfig erstellen
-cat > "${OUT_DIR}/conf/traccar.xml" <<'XML'
+# Minimal-Konfiguration mit forward.url
+cat > "${OUT_DIR}/conf/traccar.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
 <properties>
@@ -166,37 +178,41 @@ cat > "${OUT_DIR}/conf/traccar.xml" <<'XML'
   <entry key='database.url'>jdbc:h2:./data/database</entry>
   <entry key='database.user'>sa</entry>
   <entry key='database.password'></entry>
+
+  <entry key='forward.enable'>true</entry>
+  <entry key='forward.url'>http://${FORWARD_IP}:${FORWARD_PORT}/?id={uniqueId}&amp;timestamp={fixTime}&amp;lat={latitude}&amp;lon={longitude}&amp;speed={speed}&amp;bearing={course}&amp;altitude={altitude}&amp;accuracy={accuracy}&amp;status={statusCode}&amp;batt={batteryLevel}</entry>
+
   <entry key='web.port'>8082</entry>
 </properties>
-XML
+EOF
 
-# Windows-Startskript (nutzt Classpath lib/*)
+# Windows-Startskript mit Classpath
 cat > "${OUT_DIR}/run-traccar.cmd" <<'BAT'
 @echo off
 setlocal
 cd /d "%~dp0"
-REM Java 17+ erforderlich (im PATH)
+REM Java 17+ im PATH erforderlich
 java -cp "lib/*" org.traccar.Main conf\traccar.xml
 endlocal
 BAT
 
 # README
 cat > "${OUT_DIR}/README.txt" <<'TXT'
-Traccar – Windows Portable Bundle (mit Dependencies)
-====================================================
+Traccar – Windows Portable Bundle
+===============================
 Inhalt:
-- lib\ (ALLE benötigten JARs inkl. tracker-server.jar)
+- lib\ (JARs inkl. tracker-server.jar)
 - conf\traccar.xml
 - web\ (falls gebaut)
 - schema\
 - data\
 - run-traccar.cmd
 
-Windows-Start:
-1) Java 17 (Adoptium Temurin) installieren und in PATH haben.
-2) Ordner nach C:\traccar\ kopieren.
+Start unter Windows:
+1) Java 17 (Adoptium Temurin) installieren und in PATH.
+2) Ordner z. B. nach C:\traccar\ kopieren.
 3) run-traccar.cmd doppelklicken.
-Web-GUI: http://localhost:8082  (Login: admin / admin)
+Web-GUI: http://localhost:8082 (Login: admin / admin)
 TXT
 
 # ================================
@@ -208,7 +224,6 @@ log "=== Erzeuge ZIP ==="
   cd "${OUT_DIR%/*}"
   zip -r "${ZIP_PATH}" "$(basename "${OUT_DIR}")" >/dev/null
 )
-
 log "✅ Build abgeschlossen!"
-echo "Bundle-Verzeichnis:  ${OUT_DIR}"
-echo "Windows-ZIP:         ${ZIP_PATH}"
+echo "Bundle-Verzeichnis:   ${OUT_DIR}"
+echo "ZIP-Datei:             ${ZIP_PATH}"
