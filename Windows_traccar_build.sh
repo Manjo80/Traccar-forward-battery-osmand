@@ -10,7 +10,7 @@ OUT_ROOT="${WORKDIR_ROOT}/traccar-builds"
 TS="$(date +%Y%m%d-%H%M%S)"
 OUT_DIR="${OUT_ROOT}/win-bundle-${TS}"
 ZIP_PATH="${OUT_ROOT}/traccar-windows-bundle-${TS}.zip"
-PATCH_FORWARDER="${PATCH_FORWARDER:-0}"
+PATCH_FORWARDER="${PATCH_FORWARDER:-1}"
 NODE_MAJOR="${NODE_MAJOR:-20}"
 
 # ================================
