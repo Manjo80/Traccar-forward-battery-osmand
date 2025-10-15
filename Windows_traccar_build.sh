@@ -12,53 +12,63 @@ TS="$(date +%Y%m%d-%H%M%S)"
 OUT_DIR="${OUT_ROOT}/win-bundle-${TS}"
 ZIP_PATH="${OUT_ROOT}/traccar-windows-bundle-${TS}.zip"
 
-# Optional: Patch setzen (1 = aktiv)
 PATCH_FORWARDER="${PATCH_FORWARDER:-0}"
-
-# Node LTS Version (stabile Wahl für Builds). Bei Bedarf: NODE_MAJOR=22 setzen.
 NODE_MAJOR="${NODE_MAJOR:-20}"
 
 # ================================
-# Helfer
+# Helper
 # ================================
 log()  { echo -e "\033[1;32m[+] $*\033[0m"; }
 warn() { echo -e "\033[1;33m[!] $*\033[0m"; }
 die()  { echo -e "\033[1;31m[✗] $*\033[0m" >&2; exit 1; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Fehlt: $1"; }
 
-# Root-/sudo-Handling (LXC-freundlich)
-if [[ "${EUID}" -eq 0 ]]; then
-  SUDO=""
-else
-  SUDO="sudo"
-fi
+[[ $EUID -eq 0 ]] && SUDO="" || SUDO="sudo"
 
 # ================================
 # Pakete installieren (Debian/Ubuntu)
 # ================================
 if command -v apt >/dev/null 2>&1; then
-  log "Pakete installieren (apt)"
-  $SUDO apt update
-  $SUDO apt install -y git curl unzip ca-certificates build-essential openjdk-17-jdk
+  log "=== Pakete installieren ==="
+  $SUDO apt update -y
+  # Prüfen ob openjdk-17 existiert
+  if ! apt-cache show openjdk-17-jdk >/dev/null 2>&1; then
+    warn "openjdk-17-jdk nicht im Repo gefunden – Adoptium-Repository hinzufügen."
+    $SUDO apt install -y wget gnupg software-properties-common
+    wget -O- https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | $SUDO tee /usr/share/keyrings/adoptium.gpg >/dev/null
+    echo "deb [signed-by=/usr/share/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb $(lsb_release -cs) main" | $SUDO tee /etc/apt/sources.list.d/adoptium.list
+    $SUDO apt update -y
+    $SUDO apt install -y temurin-17-jdk
+    JAVA_HOME="/usr/lib/jvm/temurin-17-jdk-amd64"
+  else
+    $SUDO apt install -y gradle openjdk-17-jdk curl unzip build-essential net-tools git
+    JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
+  fi
 else
-  warn "Kein apt gefunden – setze voraus, dass Git + Java 17 vorhanden sind."
+  die "apt nicht gefunden – unterstütze derzeit nur Debian/Ubuntu."
 fi
 
-need_cmd git
-need_cmd curl
-need_cmd javac
-need_cmd java
+# ================================
+# Java 17 als Standard setzen
+# ================================
+if [[ -d "$JAVA_HOME" ]]; then
+  log "=== Java 17 als Standard setzen ==="
+  update-alternatives --install /usr/bin/java java "$JAVA_HOME/bin/java" 1 || true
+  update-alternatives --install /usr/bin/javac javac "$JAVA_HOME/bin/javac" 1 || true
+  update-alternatives --set java "$JAVA_HOME/bin/java" || true
+  update-alternatives --set javac "$JAVA_HOME/bin/javac" || true
+else
+  warn "JAVA_HOME nicht gefunden, überspringe update-alternatives."
+fi
 
-# Java-Version checken (mind. 17)
-JAVA_VER="$(java -version 2>&1 | head -n1)"
-echo "Java: ${JAVA_VER}"
-echo "${JAVA_VER}" | grep -Eq '\"(1[7-9]|2[0-9])' || warn "Stelle sicher, dass Java 17+ installiert ist."
+java -version || die "Java wurde nicht korrekt installiert."
+javac -version || die "javac nicht verfügbar."
 
 # ================================
-# Node über nvm (für Web-UI Build)
+# Node.js via nvm
 # ================================
 if ! command -v npm >/dev/null 2>&1; then
-  log "nvm + Node ${NODE_MAJOR} installieren"
+  log "=== Node.js ${NODE_MAJOR} via nvm installieren ==="
   export NVM_DIR="${HOME}/.nvm"
   if [[ ! -d "${NVM_DIR}" ]]; then
     curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
@@ -68,99 +78,71 @@ if ! command -v npm >/dev/null 2>&1; then
   nvm install "${NODE_MAJOR}"
   nvm use "${NODE_MAJOR}"
 else
-  log "Node/NPM vorhanden: $(node -v) / $(npm -v)"
+  log "Node vorhanden: $(node -v)"
 fi
 
 # ================================
-# Quellcode holen (clean)
+# Quellcode klonen
 # ================================
-log "Alte Quellen entfernen"
-$SUDO rm -rf "${SRC_DIR}"
-$SUDO mkdir -p "${SRC_DIR}"
-$SUDO chown -R "$(id -u)":"$(id -g)" "${SRC_DIR}"
+log "=== Alte Quellen entfernen ==="
+rm -rf "${SRC_DIR}"
+mkdir -p "${SRC_DIR}"
 
-log "Repo klonen (mit Submodules)"
+log "=== Repo klonen ==="
 git clone --recursive "${REPO_URL}" "${SRC_DIR}"
 cd "${SRC_DIR}"
 
 # ================================
-# Optionaler Patch (URL-Forwarder Felder)
+# Patch einfügen
 # ================================
 if [[ "${PATCH_FORWARDER}" == "1" ]]; then
-  TARGET_FILE="src/main/java/org/traccar/forward/PositionForwarderUrl.java"
-  if [[ -f "${TARGET_FILE}" ]]; then
-    log "Patch auf ${TARGET_FILE} (batteryLevel/charge Platzhalter)"
-    sed -i 's|\.replace("{statusCode}", calculateStatus(position));|.replace("{statusCode}", calculateStatus(position))\
-        .replace("{batteryLevel}", String.valueOf(position.getAttributes().getOrDefault("batteryLevel", "")))\
-        .replace("{charge}", String.valueOf(position.getAttributes().getOrDefault("charge", "")));|' \
-      "${TARGET_FILE}" || warn "Patch fehlgeschlagen (prüfe Quelltext-Version)"
-  else
-    warn "Patch-Datei nicht gefunden: ${TARGET_FILE} (andere Branch/Version?)"
-  fi
+  log "=== Patch PositionForwarderUrl.java einfügen ==="
+  sed -i 's|\.replace("{statusCode}", calculateStatus(position));|.replace("{statusCode}", calculateStatus(position))\
+      .replace("{batteryLevel}", String.valueOf(position.getAttributes().getOrDefault("batteryLevel", "")))\
+      .replace("{charge}", String.valueOf(position.getAttributes().getOrDefault("charge", "")));|' \
+      src/main/java/org/traccar/forward/PositionForwarderUrl.java || warn "Patch konnte nicht angewendet werden"
 fi
 
 # ================================
-# Build (Server, Gradle Wrapper)
+# Build starten
 # ================================
-log "Baue Traccar Server (Gradle Wrapper)"
+log "=== Build starten ==="
 chmod +x ./gradlew
 ./gradlew --no-daemon clean assemble -Dfile.encoding=UTF-8
 
-# Ergebnis-JAR finden (robust)
-log "Suche Server-JAR in build/libs"
-JAR_PATH="$(find build/libs -maxdepth 1 -type f \( -name '*server*.jar' -o -name 'tracker-server*.jar' \) | sort | tail -n1)"
-[[ -n "${JAR_PATH}" && -f "${JAR_PATH}" ]] || die "Konnte Server-JAR nicht finden (build/libs/*server*.jar)."
-echo "Gefundene JAR: ${JAR_PATH}"
+JAR_PATH="$(find build/libs -maxdepth 1 -type f -name '*server*.jar' | sort | tail -n1)"
+[[ -f "$JAR_PATH" ]] || die "Build fehlgeschlagen – keine JAR gefunden."
 
 # ================================
-# Web-UI bauen (modern bevorzugt)
+# Web-UI bauen
 # ================================
-WEB_SRC=""
-if [[ -d "modern" ]]; then
-  WEB_SRC="modern"
-elif [[ -d "traccar-web" ]]; then
-  WEB_SRC="traccar-web"
-else
-  warn "Keine moderne Web-UI gefunden (weder modern/ noch traccar-web/). Überspringe UI-Build."
-fi
-
-if [[ -n "${WEB_SRC}" ]]; then
-  log "Baue Web-UI in ${WEB_SRC}"
-  pushd "${WEB_SRC}" >/dev/null
-  if [[ -f package-lock.json ]]; then
-    npm ci
-  else
-    npm install
-  fi
+if [[ -d "modern" || -d "traccar-web" ]]; then
+  WEB_DIR=$( [[ -d "modern" ]] && echo "modern" || echo "traccar-web" )
+  log "=== Web-Interface (${WEB_DIR}) bauen ==="
+  pushd "${WEB_DIR}" >/dev/null
+  npm install --legacy-peer-deps
   npm run build
   popd >/dev/null
-fi
-
-# ================================
-# Windows-Bundle strukturieren
-# ================================
-log "Erzeuge Windows-Bundle unter ${OUT_DIR}"
-mkdir -p "${OUT_DIR}"/{conf,logs,web,schema,data}
-
-# JAR kopieren
-cp -f "${JAR_PATH}" "${OUT_DIR}/tracker-server.jar"
-
-# Schema kopieren (empfohlen)
-if [[ -d "schema" ]]; then
-  cp -a schema/* "${OUT_DIR}/schema/" || warn "Schema-Kopieren fehlgeschlagen"
 else
-  warn "Kein schema/-Ordner gefunden."
+  warn "Kein Web-Verzeichnis gefunden, überspringe UI-Build."
 fi
 
-# Web-UI Output kopieren
-if [[ -n "${WEB_SRC}" ]]; then
-  if   [[ -d "${WEB_SRC}/dist"  ]]; then cp -a "${WEB_SRC}/dist/."  "${OUT_DIR}/web/"
-  elif [[ -d "${WEB_SRC}/build" ]]; then cp -a "${WEB_SRC}/build/." "${OUT_DIR}/web/"
-  else warn "Web-UI Build-Output (dist/ oder build/) nicht gefunden."
-  fi
+# ================================
+# Windows-Bundle erstellen
+# ================================
+log "=== Windows-Bundle erstellen ==="
+mkdir -p "${OUT_DIR}"/{conf,logs,web,schema,data}
+cp -f "$JAR_PATH" "${OUT_DIR}/tracker-server.jar"
+[[ -d "schema" ]] && cp -a schema/* "${OUT_DIR}/schema/" || warn "Kein schema/-Ordner."
+
+# Web-Build übernehmen
+if [[ -d "${WEB_DIR}/dist" ]]; then
+  cp -a "${WEB_DIR}/dist/." "${OUT_DIR}/web/"
+elif [[ -d "${WEB_DIR}/build" ]]; then
+  cp -a "${WEB_DIR}/build/." "${OUT_DIR}/web/"
 fi
 
-# Minimale Beispiel-Konfiguration (H2 lokal)
+# Konfiguration hinzufügen
 cat > "${OUT_DIR}/conf/traccar.xml" <<'XML'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
@@ -170,63 +152,25 @@ cat > "${OUT_DIR}/conf/traccar.xml" <<'XML'
   <entry key='database.user'>sa</entry>
   <entry key='database.password'></entry>
   <entry key='web.port'>8082</entry>
-  <!-- Optional:
-  <entry key='forward.enable'>true</entry>
-  <entry key='forward.url'>http://127.0.0.1:8080/?id={uniqueId}&amp;lat={latitude}&amp;lon={longitude}</entry>
-  -->
 </properties>
 XML
 
-# Windows-Startskript
+# CMD-Starter für Windows
 cat > "${OUT_DIR}/run-traccar.cmd" <<'BAT'
 @echo off
-setlocal
-REM Startet Traccar portabel (Java 17+ im PATH erforderlich)
 cd /d "%~dp0"
 java -Dfile.encoding=UTF-8 -jar tracker-server.jar conf\traccar.xml
-endlocal
 BAT
-
-# README
-cat > "${OUT_DIR}/README.txt" <<'TXT'
-Traccar – Windows Portable Bundle
-=================================
-Inhalt:
-- tracker-server.jar
-- conf\traccar.xml
-- web\ (moderne Web-UI, falls gebaut)
-- schema\
-- logs\ (leer)
-- data\ (H2-Datenbank)
-- run-traccar.cmd
-
-Schnellstart (Windows):
-1) Java 17 oder 21 installieren (z. B. Adoptium Temurin).
-2) Ordner z. B. nach C:\traccar\ kopieren.
-3) run-traccar.cmd doppelklicken.
-4) Web-GUI: http://localhost:8082  (Login: admin / admin)
-
-Alternativ:
-- Offiziellen Windows-Installer nutzen, Dienst stoppen,
-  JAR und ggf. web\ in "C:\Program Files\Traccar\" ersetzen,
-  Dienst starten.
-TXT
 
 # ================================
 # ZIP erzeugen
 # ================================
 mkdir -p "${OUT_ROOT}"
-log "Erzeuge ZIP: ${ZIP_PATH}"
+log "=== ZIP erzeugen ==="
 (
   cd "${OUT_DIR%/*}"
   zip -r "${ZIP_PATH}" "$(basename "${OUT_DIR}")" >/dev/null
 )
-
-log "Fertig!"
-echo "Bundle-Verzeichnis:  ${OUT_DIR}"
-echo "Windows-ZIP:         ${ZIP_PATH}"
-
-echo
-echo "Deployment:"
-echo "  A) Portable: ZIP auf Windows entpacken, run-traccar.cmd doppelklicken."
-echo "  B) Installer: Offiziellen Windows-Installer, dann JAR/Web ersetzen."
+log "✅ Build abgeschlossen!"
+echo "→ Bundle: ${OUT_DIR}"
+echo "→ ZIP: ${ZIP_PATH}"
