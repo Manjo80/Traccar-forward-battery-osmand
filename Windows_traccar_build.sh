@@ -162,10 +162,14 @@ fi
 
 # Web-UI Output übernehmen
 if [[ -n "${WEB_SRC}" ]]; then
-  if [[ -d "${SRC_DIR}/${WEB_SRC}/dist" ]]; then
-    cp -a "${SRC_DIR}/${WEB_SRC}/dist/." "${OUT_DIR}/web/"
-  elif [[ -d "${SRC_DIR}/${WEB_SRC}/build" ]]; then
-    cp −a "${SRC_DIR}/${WEB_SRC}/build/." "${OUT_DIR}/web/"
+  if [[ -d "${SRC_DIR}/${WEB_SRC}/build" ]]; then
+    log "Kopiere Web-UI aus build/"
+    cp -r "${SRC_DIR}/${WEB_SRC}/build/." "${OUT_DIR}/web/"
+  elif [[ -d "${SRC_DIR}/${WEB_SRC}/dist" ]]; then
+    log "Kopiere Web-UI aus dist/"
+    cp -r "${SRC_DIR}/${WEB_SRC}/dist/." "${OUT_DIR}/web/"
+  else
+    warn "Kein Web-UI-Output-Ordner gefunden (build/ oder dist/). Web-UI wird nicht übernommen."
   fi
 fi
 
