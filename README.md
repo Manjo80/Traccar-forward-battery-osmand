@@ -96,7 +96,8 @@ Standard ist die interne H2-Datenbank. Optional kannst du später auf MySQL oder
 ## 📜 Lizenz
 
 Dieses Setup basiert auf dem offiziellen Open-Source-Projekt [Traccar](https://github.com/traccar/traccar) unter der Apache 2.0 Lizenz.  
-Anpassungen und Installationsskript © 2025 DeinName
+Anpassungen und Installationsskript © 2025 
+Joel
 
 ---
 
